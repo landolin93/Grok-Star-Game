@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Tracker Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .star::before { content: '★'; }
+        .circle::before { content: '●'; }
+        .grid-cell { width: 60px; height: 60px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold text-center mb-6">Star Tracker Game</h1>
+        <div class="flex justify-between mb-4">
+            <div>
+                <p id="turn-info" class="text-lg">Player 1's Turn: Place a star</p>
+                <p id="round-info" class="text-sm">Round: 1/8</p>
+            </div>
+            <div id="direction-buttons" class="hidden grid grid-cols-4 gap-2">
+                <!-- Direction buttons will be dynamically inserted here -->
+            </div>
+        </div>
+        <div id="game-board" class="grid grid-cols-6 gap-1 bg-gray-800 p-2 rounded-lg">
+            <!-- 6x6 grid cells will be dynamically inserted here -->
+        </div>
+        <div id="game-over" class="hidden mt-4 text-center">
+            <p id="winner-text" class="text-2xl font-bold"></p>
+            <button id="restart-button" class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Restart</button>
+        </div>
+    </div>
+
+    <script>
+        const directions = [
+            { key: 'N', label: 'North ↑', icon: '↑' },
+            { key: 'S', label: 'South ↓', icon: '↓' },
+            { key: 'E', label: 'East →', icon: '→' },
+            { key: 'W', label: 'West ←', icon: '←' },
+            { key: 'NE', label: 'Northeast ↗', icon: '↗' },
+            { key: 'NW', label: 'Northwest ↖', icon: '↖' },
+            { key: 'SE', label: 'Southeast ↘', icon: '↘' },
+            { key: 'SW', label: 'Southwest ↙', icon: '↙' }
+        ];
+
+        let board = Array(6).fill().map(() => Array(6).fill('empty'));
+        let currentPlayer = 1;
+        let round = 1;
+        let availableDirections = [...directions];
+        const totalRounds = 8;
+
+        const gameBoard = document.getElementById('game-board');
+        const turnInfo = document.getElementById('turn-info');
+        const roundInfo = document.getElementById('round-info');
+        const directionButtons = document.getElementById('direction-buttons');
+        const gameOver = document.getElementById('game-over');
+        const winnerText = document.getElementById('winner-text');
+        const restartButton = document.getElementById('restart-button');
+
+        function initBoard() {
+            gameBoard.innerHTML = '';
+            for (let i = 0; i < 6; i++) {
+                for (let j = 0; j < 6; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell border border-gray-700 flex items-center justify-center text-2xl cursor-pointer hover:bg-gray-700';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', () => handleCellClick(i, j));
+                    gameBoard.appendChild(cell);
+                }
+            }
+        }
+
+        function initDirectionButtons() {
+            directionButtons.innerHTML = '';
+            availableDirections.forEach(dir => {
+                const button = document.createElement('button');
+                button.className = 'px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded';
+                button.textContent = dir.icon;
+                button.title = dir.label;
+                button.addEventListener('click', () => handleDirectionClick(dir.key));
+                directionButtons.appendChild(button);
+            });
+        }
+
+        function handleCellClick(row, col) {
+            if (currentPlayer !== 1 || board[row][col] !== 'empty' || round > totalRounds) return;
+            board[row][col] = 'star';
+            updateCell(row, col);
+            currentPlayer = 2;
+            updateUI();
+        }
+
+        function handleDirectionClick(direction) {
+            if (currentPlayer !== 2 || round > totalRounds) return;
+            applyDirection(direction);
+            availableDirections = availableDirections.filter(dir => dir.key !== direction);
+            round++;
+            currentPlayer = 1;
+            updateUI();
+            checkGameOver();
+        }
+
+        function applyDirection(direction) {
+            const stars = [];
+            for (let i = 0; i < 6; i++) {
+                for (let j = 0; j < 6; j++) {
+                    if (board[i][j] === 'star') stars.push([i, j]);
+                }
+            }
+
+            stars.forEach(([row, col]) => {
+                let cellsToChange = [];
+                if (direction === 'N') {
+                    for (let i = row; i >= 0; i--) cellsToChange.push([i, col]);
+                } else if (direction === 'S') {
+                    for (let i = row; i < 6; i++) cellsToChange.push([i, col]);
+                } else if (direction === 'E') {
+                    for (let j = col; j < 6; j++) cellsToChange.push([row, j]);
+                } else if (direction === 'W') {
+                    for (let j = col; j >= 0; j--) cellsToChange.push([row, j]);
+                } else if (direction === 'NE') {
+                    for (let i = row, j = col; i >= 0 && j < 6; i--, j++) cellsToChange.push([i, j]);
+                } else if (direction === 'NW') {
+                    for (let i = row, j = col; i >= 0 && j >= 0; i--, j--) cellsToChange.push([i, j]);
+                } else if (direction === 'SE') {
+                    for (let i = row, j = col; i < 6 && j < 6; i++, j++) cellsToChange.push([i, j]);
+                } else if (direction === 'SW') {
+                    for (let i = row, j = col; i < 6 && j >= 0; i++, j--) cellsToChange.push([i, j]);
+                }
+                cellsToChange.forEach(([r, c]) => {
+                    if (board[r][c] === 'star' || board[r][c] === 'empty') {
+                        board[r][c] = 'circle';
+                        updateCell(r, c);
+                    }
+                });
+            });
+        }
+
+        function updateCell(row, col) {
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell.className = `grid-cell border border-gray-700 flex items-center justify-center text-2xl ${board[row][col] === 'star' ? 'star text-yellow-400' : board[row][col] === 'circle' ? 'circle text-blue-400' : ''}`;
+            cell.style.cursor = board[row][col] === 'empty' && currentPlayer === 1 ? 'pointer' : 'default';
+        }
+
+        function updateUI() {
+            turnInfo.textContent = currentPlayer === 1 ? "Player 1's Turn: Place a star" : "Player 2's Turn: Choose a direction";
+            roundInfo.textContent = `Round: ${round}/${totalRounds}`;
+            directionButtons.className = currentPlayer === 2 ? 'grid grid-cols-4 gap-2' : 'hidden';
+            initDirectionButtons();
+        }
+
+        function checkGameOver() {
+            if (round > totalRounds) {
+                const hasEmpty = board.flat().some(cell => cell === 'empty');
+                winnerText.textContent = hasEmpty ? 'Player 1 Wins!' : 'Player 2 Wins!';
+                gameOver.className = 'mt-4 text-center';
+                gameBoard.className += ' pointer-events-none';
+            }
+        }
+
+        function restartGame() {
+            board = Array(6).fill().map(() => Array(6).fill('empty'));
+            currentPlayer = 1;
+            round = 1;
+            availableDirections = [...directions];
+            gameOver.className = 'hidden';
+            gameBoard.className = 'grid grid-cols-6 gap-1 bg-gray-800 p-2 rounded-lg';
+            initBoard();
+            updateUI();
+        }
+
+        restartButton.addEventListener('click', restartGame);
+        initBoard();
+        updateUI();
+    </script>
+</body>
+</html>
